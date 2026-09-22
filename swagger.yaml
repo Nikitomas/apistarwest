@@ -1,0 +1,273 @@
+openapi: 3.0.3
+info:
+  title: apistarwest E-commerce API
+  description: >
+    In-memory e-commerce REST API supporting user registration, JWT login,
+    and checkout with cash/credit card payment methods.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Registration and login
+  - name: Checkout
+    description: Checkout operations
+  - name: Health
+    description: Service healthcheck
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Healthcheck
+      description: Returns the API status and process uptime.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and receive a JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/checkout:
+    post:
+      tags: [Checkout]
+      summary: Perform a checkout
+      description: >
+        Requires a valid JWT. Accepts only "cash" or "credit_card" as
+        paymentMethod. Cash payments receive a 10% discount on the subtotal.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          description: Checkout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '400':
+          description: Invalid payment method or items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing, invalid, or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        uptime:
+          type: number
+          example: 12.345
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: Dana Lee
+        email:
+          type: string
+          format: email
+          example: dana@example.com
+        password:
+          type: string
+          format: password
+          example: dana123
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 4
+        name:
+          type: string
+          example: Dana Lee
+        email:
+          type: string
+          example: dana@example.com
+        role:
+          type: string
+          example: customer
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        password:
+          type: string
+          format: password
+          example: alice123
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    CheckoutItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: integer
+          example: 1
+        quantity:
+          type: integer
+          example: 2
+
+    CheckoutRequest:
+      type: object
+      required: [items, paymentMethod]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutItem'
+        paymentMethod:
+          type: string
+          enum: [cash, credit_card]
+          example: cash
+
+    CheckoutLineItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Wireless Mouse
+        unitPrice:
+          type: number
+          example: 25.99
+        quantity:
+          type: integer
+          example: 2
+        lineTotal:
+          type: number
+          example: 51.98
+
+    CheckoutResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutLineItem'
+        paymentMethod:
+          type: string
+          example: cash
+        subtotal:
+          type: number
+          example: 51.98
+        discount:
+          type: number
+          example: 5.2
+        total:
+          type: number
+          example: 46.78
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid email or password
